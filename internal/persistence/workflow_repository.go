@@ -110,3 +110,118 @@ func (db *DB) CreateWorkflow(
 
 	return nil
 }
+func (db *DB) MarkWorkflowRunning(
+	ctx context.Context,
+	workflowID string,
+) error {
+
+	_, err := db.Pool.Exec(
+		ctx,
+		`
+		UPDATE workflows
+		SET status = $1,
+		    started_at = NOW()
+		WHERE id = $2
+		`,
+		workflow.WorkflowRunning,
+		workflowID,
+	)
+
+	if err != nil {
+		return fmt.Errorf("mark workflow running: %w", err)
+	}
+
+	return nil
+}
+
+func (db *DB) MarkWorkflowCompleted(
+	ctx context.Context,
+	workflowID string,
+) error {
+
+	_, err := db.Pool.Exec(
+		ctx,
+		`
+		UPDATE workflows
+		SET status = $1,
+		    completed_at = NOW()
+		WHERE id = $2
+		`,
+		workflow.WorkflowCompleted,
+		workflowID,
+	)
+
+	if err != nil {
+		return fmt.Errorf("mark workflow completed: %w", err)
+	}
+
+	return nil
+}
+
+func (db *DB) MarkWorkflowFailed(
+	ctx context.Context,
+	workflowID string,
+) error {
+
+	_, err := db.Pool.Exec(
+		ctx,
+		`
+		UPDATE workflows
+		SET status = $1,
+		    completed_at = NOW()
+		WHERE id = $2
+		`,
+		workflow.WorkflowFailed,
+		workflowID,
+	)
+
+	if err != nil {
+		return fmt.Errorf("mark workflow failed: %w", err)
+	}
+
+	return nil
+}
+
+func (db *DB) GetWorkflow(
+	ctx context.Context,
+	workflowID string,
+) (*workflow.Workflow, error) {
+
+	var w workflow.Workflow
+
+	err := db.Pool.QueryRow(
+		ctx,
+		`
+		SELECT
+			id,
+			name,
+			status,
+			created_at,
+			started_at,
+			completed_at
+		FROM workflows
+		WHERE id = $1
+		`,
+		workflowID,
+	).Scan(
+		&w.ID,
+		&w.Name,
+		&w.Status,
+		&w.CreatedAt,
+		&w.StartedAt,
+		&w.CompletedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("get workflow: %w", err)
+	}
+
+	tasks, err := db.GetTasks(ctx, workflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	w.Tasks = tasks
+
+	return &w, nil
+}
